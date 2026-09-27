@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chỉ số điện - Điện nhà mình</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .row-actions button { padding: 8px 16px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div data-appbar-placeholder></div>
+    <main>
+        <div id="error-message" style="display: none;" class="alert error"></div>
+
+        <section class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h1>Danh sách chỉ số điện</h1>
+                <button onclick="location.href='/admin/reading_form.html'" class="button primary">
+                    + Nhập chỉ số mới
+                </button>
+            </div>
+
+            <div id="loading" style="text-align: center; padding: 40px;">
+                <div class="spinner"></div>
+            </div>
+
+            <table id="readings-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Mã KH</th>
+                        <th>Kỳ</th>
+                        <th>Chỉ số cũ</th>
+                        <th>Chỉ số mới</th>
+                        <th>Tiêu thụ</th>
+                        <th>Ngày ghi</th>
+                        <th>Trạng thái</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="readings"></tbody>
+            </table>
+        </section>
+    </main>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/appbar.js"></script>
+    <script>
+        requireAuth();
+        mountAppbar('admin');
+
+        async function load() {
+            try {
+                const readings = await api('/admin/meter-readings');
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('readings-table').style.display = 'table';
+
+                const tbody = document.getElementById('readings');
+                if (readings.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 40px;">Chưa có chỉ số nào</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = readings.map(r => `
+                    <tr>
+                        <td><strong style="color: var(--primary-light);">${r.household?.customer_code || 'N/A'}</strong></td>
+                        <td>${r.period}</td>
+                        <td>${r.old_reading}</td>
+                        <td><strong>${r.new_reading}</strong></td>
+                        <td><strong style="font-size: 16px;">${r.consumption} kWh</strong></td>
+                        <td>${new Date(r.recorded_at).toLocaleDateString('vi-VN')}</td>
+                        <td>
+                            ${r.has_invoice
+                                ? '<span class="badge paid">✓ Đã tính hóa đơn</span>'
+                                : '<span class="badge active">Chưa tính</span>'}
+                        </td>
+                        <td>
+                            <div class="row-actions">
+                                ${r.has_invoice
+                                    ? '<span style="color: var(--muted); font-size: 13px;">🔒 Đã khóa</span>'
+                                    : `<button onclick="editReading('${r.id}', ${r.new_reading})" class="button secondary">Sửa</button>
+                                       <button onclick="calculateInvoice('${r.id}')" class="button primary">Tính hóa đơn</button>
+                                       <button onclick="deleteReading('${r.id}', '${r.period}', '${r.household?.customer_code || ''}')" class="button danger">Xóa</button>`
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                document.getElementById('loading').style.display = 'none';
+                showError(err.message || 'Không thể tải danh sách chỉ số');
+            }
+        }
+
+        async function calculateInvoice(readingId) {
+            const ok = await toastConfirm('Xác nhận tính hóa đơn', 'Sau khi tính, bạn sẽ không thể sửa/xóa chỉ số và không thể tính lại hóa đơn cho chỉ số này.', 'Tính hóa đơn', 'Hủy');
+            if (!ok) return;
+
+            try {
+                await api('/admin/invoices/calculate', {
+                    method: 'POST',
+                    body: JSON.stringify({ meter_reading_id: readingId })
+                });
+
+                toastSuccess('Đã tính hóa đơn', 'Hóa đơn đã được tạo thành công.');
+                load();
+            } catch (err) {
+                toastError('Tính hóa đơn thất bại', err.message || 'Vui lòng thử lại.');
+            }
+        }
+
+        async function editReading(readingId, currentValue) {
+            const newReading = await toastPromptNumber(
+                `Sửa chỉ số (hiện tại: ${currentValue})`,
+                currentValue,
+                0
+            );
+            if (newReading === null) return;
+            if (newReading === currentValue) {
+                toastInfo('Không có thay đổi', 'Chỉ số không thay đổi.');
+                return;
+            }
+
+            try {
+                await api(`/admin/meter-readings/${readingId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ new_reading: newReading })
+                });
+                toastSuccess('Đã cập nhật', `Chỉ số mới: ${newReading}`);
+                load();
+            } catch (err) {
+                toastError('Không thể cập nhật', err.message || 'Có thể chỉ số đã được tính hóa đơn.');
+            }
+        }
+
+        // === Xóa meter reading (chỉ khi CHƯA tính hóa đơn) ===
+        async function deleteReading(id, period, customerCode) {
+            const ok = await toastConfirm(
+                'Xóa chỉ số điện?',
+                `Chỉ số kỳ ${period} của hộ ${customerCode} sẽ bị XÓA VĨNH VIỄN (không thể khôi phục). Hành động này chỉ khả thi khi chỉ số CHƯA được tính hóa đơn.`,
+                'Xóa',
+                'Hủy'
+            );
+            if (!ok) return;
+
+            try {
+                const result = await api(`/admin/meter-readings/${id}`, { method: 'DELETE' });
+                toastSuccess('Đã xóa', result.message || `Chỉ số kỳ ${period} đã được xóa.`);
+                load();
+            } catch (err) {
+                toastError('Xóa thất bại', err.message || 'Có thể chỉ số đã được tính hóa đơn.');
+            }
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('error-message');
+            el.textContent = msg;
+            el.style.display = 'block';
+            if (msg.includes('401') || msg.includes('Unauthorized')) {
+                setTimeout(() => location.href = '/auth/admin_login.html', 2000);
+            }
+        }
+
+        load();
+    </script>
+</body>
+</html>

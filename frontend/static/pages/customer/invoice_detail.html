@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chi tiết hóa đơn - Điện nhà mình</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div data-appbar-placeholder></div>
+    <main>
+        <div id="error-message" style="display: none;" class="alert error"></div>
+
+        <div id="loading" style="text-align: center; padding: 80px;">
+            <div class="spinner"></div>
+        </div>
+
+        <div id="invoice-container" style="display: none;">
+            <section class="panel">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 32px;">
+                    <div>
+                        <h1 id="invoice-period" style="margin-bottom: 8px;">Hóa đơn điện</h1>
+                        <span id="invoice-status-badge"></span>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 14px; color: var(--muted);">Tổng thanh toán</div>
+                        <div id="invoice-total" style="font-size: 32px; font-weight: 700; color: var(--primary-light);"></div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 32px; padding: 24px; background: var(--page); border: 1px solid var(--line); border-radius: 12px;">
+                    <div>
+                        <div style="font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Tiêu thụ</div>
+                        <div id="consumption" style="font-size: 24px; font-weight: 600; color: var(--ink);"></div>
+                    </div>
+                    <div>
+                        <div style="font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Ngày phát hành</div>
+                        <div id="issued-date" style="font-size: 16px; font-weight: 500; color: var(--ink);"></div>
+                    </div>
+                    <div>
+                        <div style="font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Hạn thanh toán</div>
+                        <div id="due-date" style="font-size: 16px; font-weight: 500; color: var(--ink);"></div>
+                    </div>
+                </div>
+
+                <h3 style="margin-bottom: 16px; font-size: 18px;">📊 Chi tiết tính theo bậc thang</h3>
+                <table class="tier-table">
+                    <thead>
+                        <tr>
+                            <th>Bậc</th>
+                            <th style="text-align: right;">Số kWh</th>
+                            <th style="text-align: right;">Đơn giá</th>
+                            <th style="text-align: right;">Thành tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tier-details"></tbody>
+                    <tfoot style="border-top: 2px solid var(--line);">
+                        <tr>
+                            <td colspan="3" style="text-align: right; padding: 12px 16px; font-weight: 500;">Tổng tiền điện</td>
+                            <td id="subtotal" style="text-align: right; padding: 12px 16px; font-weight: 600; font-size: 16px;"></td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" style="text-align: right; padding: 12px 16px;">VAT (8%)</td>
+                            <td id="vat" style="text-align: right; padding: 12px 16px;"></td>
+                        </tr>
+                        <tr style="background: rgba(56, 189, 248, 0.05);">
+                            <td colspan="3" style="text-align: right; padding: 16px; font-weight: 700; font-size: 18px; color: var(--ink);">TỔNG CỘNG</td>
+                            <td id="total-amount" style="text-align: right; padding: 16px; font-weight: 700; font-size: 18px; color: var(--primary-light);"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </section>
+
+            <section id="payment-section" class="panel"></section>
+        </div>
+    </main>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/appbar.js"></script>
+    <script>
+        requireAuth();
+        mountAppbar('customer');
+        const invoiceId = new URLSearchParams(location.search).get('id');
+        let currentInvoice = null;
+
+        async function loadInvoice() {
+            try {
+                currentInvoice = await api(`/customer/invoices/${invoiceId}`);
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('invoice-container').style.display = 'block';
+
+                // Header info
+                document.getElementById('invoice-period').textContent = `Hóa đơn kỳ ${currentInvoice.meter_reading?.period || 'N/A'}`;
+                document.getElementById('invoice-total').textContent = `${(currentInvoice.total_amount || 0).toLocaleString('vi-VN')} đ`;
+
+                const dueDate = new Date(currentInvoice.due_date);
+                const today = new Date();
+                const isOverdue = currentInvoice.status === 'unpaid' && dueDate < today;
+                const displayStatus = isOverdue ? 'overdue' : currentInvoice.status;
+
+                document.getElementById('invoice-status-badge').innerHTML = `
+                    <span class="badge ${displayStatus}">${
+                        displayStatus === 'paid' ? 'Đã thanh toán' :
+                        displayStatus === 'overdue' ? 'Quá hạn' : 'Chưa thanh toán'
+                    }</span>
+                `;
+
+                // Stats
+                document.getElementById('consumption').textContent = `${currentInvoice.meter_reading?.consumption || 0} kWh`;
+                document.getElementById('issued-date').textContent = new Date(currentInvoice.issued_at).toLocaleDateString('vi-VN');
+                document.getElementById('due-date').textContent = dueDate.toLocaleDateString('vi-VN');
+
+                // Tier breakdown
+                const tiers = currentInvoice.tier_details || [];
+                document.getElementById('tier-details').innerHTML = tiers.map(t => `
+                    <tr>
+                        <td>Bậc ${t.tier_no}</td>
+                        <td style="text-align: right;">${t.kwh_applied} kWh</td>
+                        <td style="text-align: right;">${(t.unit_price || 0).toLocaleString('vi-VN')} đ</td>
+                        <td style="text-align: right; font-weight: 600;">${(t.amount || 0).toLocaleString('vi-VN')} đ</td>
+                    </tr>
+                `).join('');
+
+                document.getElementById('subtotal').textContent = `${(currentInvoice.subtotal || 0).toLocaleString('vi-VN')} đ`;
+                document.getElementById('vat').textContent = `${(currentInvoice.vat_amount || 0).toLocaleString('vi-VN')} đ`;
+                document.getElementById('total-amount').textContent = `${(currentInvoice.total_amount || 0).toLocaleString('vi-VN')} đ`;
+
+                // Payment section
+                if (currentInvoice.status === 'unpaid') {
+                    document.getElementById('payment-section').innerHTML = `
+                        <h3 style="margin-bottom: 20px;">💳 Thanh toán hóa đơn</h3>
+                        <div style="background: var(--page); border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <span style="font-size: 16px; color: var(--muted);">Số tiền cần thanh toán</span>
+                                <span style="font-size: 28px; font-weight: 700; color: var(--primary-light);">${(currentInvoice.total_amount || 0).toLocaleString('vi-VN')} đ</span>
+                            </div>
+                            <button onclick="payInvoice()" class="button primary" style="width: 100%;">
+                                💳 Thanh toán ngay
+                            </button>
+                        </div>
+                        <p style="color: var(--muted); font-size: 14px; text-align: center;">
+                            Thanh toán an toàn và bảo mật qua hệ thống
+                        </p>
+                    `;
+                } else {
+                    const payment = currentInvoice.payments?.[0];
+                    document.getElementById('payment-section').innerHTML = `
+                        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--success); border-radius: 12px; padding: 24px; text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">✓</div>
+                            <h3 style="color: var(--success); margin-bottom: 12px;">Đã thanh toán</h3>
+                            <p style="color: var(--muted);">Số tiền: <strong>${(currentInvoice.total_amount || 0).toLocaleString('vi-VN')} đ</strong></p>
+                            ${payment ? `<p style="color: var(--muted); margin-top: 8px;">Ngày thanh toán: ${new Date(payment.paid_at).toLocaleString('vi-VN')}</p>` : ''}
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                document.getElementById('loading').style.display = 'none';
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = err.message || 'Không thể tải chi tiết hóa đơn';
+                errorDiv.style.display = 'block';
+
+                if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+                    setTimeout(() => location.href = '/auth/customer_login.html', 2000);
+                }
+            }
+        }
+
+        async function payInvoice() {
+            const ok = await toastConfirm(
+                'Xác nhận thanh toán',
+                `Thanh toán ${(currentInvoice.total_amount || 0).toLocaleString('vi-VN')} đ cho hóa đơn kỳ ${currentInvoice.meter_reading?.period || ''}?`,
+                'Thanh toán',
+                'Hủy'
+            );
+            if (!ok) return;
+
+            try {
+                await api(`/customer/invoices/${invoiceId}/pay`, {
+                    method: 'POST',
+                    body: JSON.stringify({})
+                });
+                toastSuccess('Thanh toán thành công', `Đã ghi nhận thanh toán ${(currentInvoice.total_amount || 0).toLocaleString('vi-VN')} đ`);
+                setTimeout(() => loadInvoice(), 1000);
+            } catch (err) {
+                toastError('Thanh toán thất bại', err.message || 'Vui lòng thử lại.');
+            }
+        }
+
+        loadInvoice();
+    </script>
+</body>
+</html>

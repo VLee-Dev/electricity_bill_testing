@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Appbar Component</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<!-- ADMIN_NAVBAR -->
+<header class="appbar" data-appbar="admin">
+    <strong><a href="/admin/dashboard.html" style="color: var(--primary-light); text-decoration: none;">⚡ Điện nhà mình</a> <span style="color: var(--accent); font-size: 14px;">| Admin</span></strong>
+    <nav>
+        <a href="/admin/households.html">Hộ dân</a>
+        <a href="/admin/meter_readings.html">Chỉ số điện</a>
+        <a href="/admin/invoices.html">Hóa đơn</a>
+        <a href="/admin/price_tiers.html">Bảng giá</a>
+        <button onclick="logout()" class="button secondary">Đăng xuất</button>
+    </nav>
+</header>
+
+<!-- CUSTOMER_NAVBAR -->
+<header class="appbar" data-appbar="customer">
+    <strong>⚡ Điện nhà mình <span style="color: var(--primary-light); font-size: 14px;">| Khách hàng</span></strong>
+    <nav>
+        <a href="/customer/dashboard.html">Dashboard</a>
+        <a href="/customer/invoices.html">Hóa đơn của tôi</a>
+        <a href="/customer/price_tiers.html">Bảng giá điện</a>
+        <button onclick="logout()" class="button secondary">Đăng xuất</button>
+    </nav>
+</header>
+
+</body>
+</html>

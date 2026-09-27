@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Điện nhà mình - Hệ thống quản lý tiền điện</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .landing-hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .landing-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(56, 189, 248, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(14, 165, 233, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .landing-hero::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(rgba(56, 189, 248, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(56, 189, 248, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+        }
+
+        .landing-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .landing-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 80px;
+            align-items: center;
+        }
+
+        .landing-left h1 {
+            font-size: 56px;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 24px;
+            color: #F8FAFC;
+        }
+
+        .landing-left h1 .highlight {
+            color: #38BDF8;
+        }
+
+        .landing-left .tagline {
+            font-size: 20px;
+            line-height: 1.6;
+            color: #94A3B8;
+            margin-bottom: 40px;
+            max-width: 500px;
+        }
+
+        .landing-actions {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .landing-actions .button {
+            padding: 16px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+
+        .landing-actions .button.primary {
+            background: linear-gradient(135deg, #0EA5E9 0%, #38BDF8 100%);
+            color: #FFF;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+        }
+
+        .landing-actions .button.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(14, 165, 233, 0.5);
+        }
+
+        .landing-actions .button.secondary {
+            background: rgba(248, 250, 252, 0.1);
+            color: #F8FAFC;
+            border: 1px solid rgba(248, 250, 252, 0.2);
+        }
+
+        .landing-actions .button.secondary:hover {
+            background: rgba(248, 250, 252, 0.15);
+            border-color: rgba(248, 250, 252, 0.3);
+        }
+
+        .landing-right {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .feature-box {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 16px;
+            padding: 28px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .feature-box:hover {
+            border-color: rgba(56, 189, 248, 0.5);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(14, 165, 233, 0.2);
+        }
+
+        .feature-box .icon {
+            font-size: 40px;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        .feature-box h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #F8FAFC;
+            margin-bottom: 8px;
+        }
+
+        .feature-box p {
+            font-size: 14px;
+            color: #94A3B8;
+            line-height: 1.5;
+        }
+
+        .stats-bar {
+            margin-top: 60px;
+            padding-top: 40px;
+            border-top: 1px solid rgba(248, 250, 252, 0.1);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-item .number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #38BDF8;
+            margin-bottom: 8px;
+        }
+
+        .stat-item .label {
+            font-size: 14px;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        @media (max-width: 968px) {
+            .landing-grid {
+                grid-template-columns: 1fr;
+                gap: 60px;
+            }
+
+            .landing-left h1 {
+                font-size: 42px;
+            }
+
+            .stats-bar {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .landing-right {
+                grid-template-columns: 1fr;
+            }
+
+            .landing-left h1 {
+                font-size: 36px;
+            }
+
+            .landing-actions {
+                flex-direction: column;
+            }
+
+            .landing-actions .button {
+                width: 100%;
+                text-align: center;
+            }
+        }
+
+        footer {
+            background: #0B0E14;
+            padding: 24px;
+            text-align: center;
+            color: #64748B;
+            font-size: 14px;
+            border-top: 1px solid rgba(248, 250, 252, 0.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="landing-hero">
+        <div class="landing-container">
+            <div class="landing-grid">
+                <div class="landing-left">
+                    <h1>
+                        <span class="highlight">⚡ Điện nhà mình</span><br>
+                        Quản lý tiền điện thông minh
+                    </h1>
+                    <p class="tagline">
+                        Hệ thống quản lý và thanh toán hóa đơn tiền điện tự động, chính xác với biểu giá bậc thang 6 mức. Theo dõi tiêu thụ và thanh toán online dễ dàng.
+                    </p>
+                    <div class="landing-actions">
+                        <a href="/auth/admin_login.html" class="button primary">
+                            🔐 Quản trị viên
+                        </a>
+                        <a href="/auth/customer_login.html" class="button secondary">
+                            👤 Khách hàng
+                        </a>
+                    </div>
+
+                    <div class="stats-bar">
+                        <div class="stat-item">
+                            <div class="number">6</div>
+                            <div class="label">Bậc thang giá</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="number">100%</div>
+                            <div class="label">Tự động</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="number">24/7</div>
+                            <div class="label">Trực tuyến</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="landing-right">
+                    <div class="feature-box">
+                        <span class="icon">📊</span>
+                        <h3>Tính toán chính xác</h3>
+                        <p>Tự động tính tiền theo biểu giá bậc thang 6 mức của EVN</p>
+                    </div>
+                    <div class="feature-box">
+                        <span class="icon">📧</span>
+                        <h3>Thông báo email</h3>
+                        <p>Nhận hóa đơn qua email ngay khi được phát hành</p>
+                    </div>
+                    <div class="feature-box">
+                        <span class="icon">💳</span>
+                        <h3>Thanh toán online</h3>
+                        <p>Thanh toán an toàn, nhanh chóng qua hệ thống</p>
+                    </div>
+                    <div class="feature-box">
+                        <span class="icon">📈</span>
+                        <h3>Theo dõi tiêu thụ</h3>
+                        <p>Xem lịch sử và phân tích mức tiêu thụ điện</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        © 2026 Điện nhà mình - Hệ thống quản lý và thanh toán tiền điện
+    </footer>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quản lý hóa đơn - Điện nhà mình</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div data-appbar-placeholder></div>
+    <main>
+        <div id="error-message" style="display: none;" class="alert error"></div>
+
+        <section class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h1>Danh sách hóa đơn</h1>
+                <button onclick="location.href='/admin/meter_readings.html'" class="button primary">
+                    Xem chỉ số điện
+                </button>
+            </div>
+
+            <div class="search-bar">
+                <input id="search" type="search" placeholder="🔍 Tìm theo mã khách hàng...">
+                <select id="status-filter" style="padding: 12px 16px; background: var(--page); border: 1px solid var(--line); border-radius: 8px; color: var(--ink);">
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="paid">Đã thanh toán</option>
+                    <option value="unpaid">Chưa thanh toán</option>
+                    <option value="overdue">Quá hạn</option>
+                </select>
+            </div>
+
+            <div id="loading" style="text-align: center; padding: 40px;">
+                <div class="spinner"></div>
+            </div>
+
+            <table id="invoices-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Mã KH</th>
+                        <th>Kỳ</th>
+                        <th>Tiêu thụ</th>
+                        <th>Tổng tiền</th>
+                        <th>Trạng thái</th>
+                        <th>Hạn thanh toán</th>
+                    </tr>
+                </thead>
+                <tbody id="invoices"></tbody>
+            </table>
+        </section>
+    </main>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/appbar.js"></script>
+    <script>
+        requireAuth();
+        mountAppbar('admin');
+        let allInvoices = [];
+
+        async function loadInvoices() {
+            try {
+                allInvoices = await api('/admin/invoices');
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('invoices-table').style.display = 'table';
+                renderInvoices(allInvoices);
+            } catch (err) {
+                document.getElementById('loading').style.display = 'none';
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = err.message || 'Không thể tải danh sách hóa đơn';
+                errorDiv.style.display = 'block';
+
+                if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+                    setTimeout(() => location.href = '/auth/admin_login.html', 2000);
+                }
+            }
+        }
+
+        function renderInvoices(list) {
+            const tbody = document.getElementById('invoices');
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 40px;">Không tìm thấy hóa đơn nào</td></tr>';
+                return;
+            }
+            tbody.innerHTML = list.map(inv => {
+                const dueDate = new Date(inv.due_date);
+                const today = new Date();
+                const isOverdue = inv.status === 'unpaid' && dueDate < today;
+                const displayStatus = isOverdue ? 'overdue' : inv.status;
+
+                return `
+                    <tr style="cursor: pointer;" onclick="viewInvoice('${inv.id}')">
+                        <td><strong style="color: var(--primary-light);">${inv.household?.customer_code || 'N/A'}</strong></td>
+                        <td>${inv.meter_reading?.period || 'N/A'}</td>
+                        <td>${inv.meter_reading?.consumption || 0} kWh</td>
+                        <td><strong style="font-size: 16px;">${(inv.total_amount || 0).toLocaleString('vi-VN')} đ</strong></td>
+                        <td>
+                            <span class="badge ${displayStatus}">${
+                                displayStatus === 'paid' ? 'Đã thanh toán' :
+                                displayStatus === 'overdue' ? 'Quá hạn' : 'Chưa thanh toán'
+                            }</span>
+                        </td>
+                        <td>${dueDate.toLocaleDateString('vi-VN')}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function viewInvoice(id) {
+            location.href = `/admin/invoice_detail.html?id=${id}`;
+        }
+
+        document.getElementById('search').oninput = filterInvoices;
+        document.getElementById('status-filter').onchange = filterInvoices;
+
+        function filterInvoices() {
+            const searchTerm = document.getElementById('search').value.toLowerCase();
+            const statusFilter = document.getElementById('status-filter').value;
+
+            const filtered = allInvoices.filter(inv => {
+                const matchesSearch = !searchTerm ||
+                    inv.household?.customer_code?.toLowerCase().includes(searchTerm) ||
+                    inv.household?.full_name?.toLowerCase().includes(searchTerm);
+
+                const dueDate = new Date(inv.due_date);
+                const today = new Date();
+                const isOverdue = inv.status === 'unpaid' && dueDate < today;
+                const actualStatus = isOverdue ? 'overdue' : inv.status;
+
+                const matchesStatus = !statusFilter || actualStatus === statusFilter;
+
+                return matchesSearch && matchesStatus;
+            });
+
+            renderInvoices(filtered);
+        }
+
+        loadInvoices();
+    </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Đăng nhập Admin - Điện nhà mình</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="appbar">
+        <strong>⚡ Điện nhà mình</strong>
+        <nav><a href="/">← Trang chủ</a></nav>
+    </header>
+    <main>
+        <section class="panel" style="max-width: 480px; margin: 80px auto;">
+            <h1>🔐 Đăng nhập Quản trị</h1>
+            <p style="color: var(--muted); margin-bottom: 32px;">Quản lý hệ thống điện và hóa đơn</p>
+
+            <div id="error-message" style="display: none;" class="alert error"></div>
+
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Tên đăng nhập</label>
+                    <input id="username" type="text" placeholder="admin" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Mật khẩu</label>
+                    <input id="password" type="password" placeholder="••••••••" required>
+                </div>
+
+                <button type="submit" class="button primary" style="width: 100%; margin-top: 8px;">
+                    <span id="btn-text">Đăng nhập</span>
+                    <span id="btn-spinner" style="display: none;" class="spinner"></span>
+                </button>
+            </form>
+
+            <p style="text-align: center; margin-top: 24px; color: var(--muted);">
+                Khách hàng? <a href="/auth/customer_login.html">Đăng nhập Khách hàng →</a>
+            </p>
+        </section>
+    </main>
+
+    <script src="/static/js/api.js"></script>
+    <script>
+        const form = document.getElementById('login-form');
+        const errorDiv = document.getElementById('error-message');
+        const btnText = document.getElementById('btn-text');
+        const btnSpinner = document.getElementById('btn-spinner');
+
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => { errorDiv.style.display = 'none'; }, 5000);
+        }
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            btnText.style.display = 'none';
+            btnSpinner.style.display = 'inline-block';
+            errorDiv.style.display = 'none';
+
+            try {
+                const data = await api('/admin/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value,
+                        password: document.getElementById('password').value
+                    })
+                });
+                saveAuth(data.access_token, 'admin');
+                location.href = '/admin/dashboard.html';
+            } catch (err) {
+                showError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại tên đăng nhập và mật khẩu.');
+                btnText.style.display = 'inline-block';
+                btnSpinner.style.display = 'none';
+            }
+        };
+    </script>
+</body>
+</html>

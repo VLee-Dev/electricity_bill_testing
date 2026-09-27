@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quản lý bảng giá điện - Admin</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div data-appbar-placeholder></div>
+    <main>
+        <div id="error-message" style="display: none;" class="alert error"></div>
+        <div id="success-message" style="display: none;" class="alert success"></div>
+
+        <section class="panel" style="max-width: 1200px; margin: 40px auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <div>
+                    <h1>💰 Bảng giá điện</h1>
+                    <p style="color: var(--muted); margin-top: 8px;">Quản lý biểu giá bậc thang</p>
+                </div>
+            </div>
+
+            <div id="price-tiers-container">
+                <div style="text-align: center; padding: 40px; color: var(--muted);">
+                    <span class="spinner"></span>
+                    <p>Đang tải bảng giá...</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="edit-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Cập nhật giá điện</h2>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <form id="edit-form">
+                <input type="hidden" id="edit-tier-id">
+
+                <div class="form-group">
+                    <label>Bậc giá</label>
+                    <input id="edit-tier-info" type="text" readonly style="background: #f5f5f5;">
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-unit-price">Đơn giá mới (đ/kWh) *</label>
+                    <input id="edit-unit-price" type="number" min="1" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-effective-from">Ngày hiệu lực *</label>
+                    <input id="edit-effective-from" type="date" required>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="button" class="button secondary" onclick="closeEditModal()" style="flex: 1;">Hủy</button>
+                    <button type="submit" class="button primary" style="flex: 1;">
+                        <span id="save-text">Lưu thay đổi</span>
+                        <span id="save-spinner" style="display: none;" class="spinner"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/appbar.js"></script>
+    <script>
+        requireAuth();
+        mountAppbar('admin');
+
+        const errorDiv = document.getElementById('error-message');
+        const successDiv = document.getElementById('success-message');
+        const container = document.getElementById('price-tiers-container');
+        const modal = document.getElementById('edit-modal');
+        const editForm = document.getElementById('edit-form');
+        const saveText = document.getElementById('save-text');
+        const saveSpinner = document.getElementById('save-spinner');
+
+        // Lấy ngày cập nhật mới nhất (effective_from lớn nhất trong danh sách bậc giá hiện hành)
+        function getLatestUpdateDate(tiers) {
+            if (!tiers || tiers.length === 0) return null;
+            const dates = tiers.map(t => t.effective_from).filter(Boolean);
+            if (dates.length === 0) return null;
+            // So sánh chuỗi ISO YYYY-MM-DD an toàn theo lexicographic
+            return dates.reduce((max, d) => (d > max ? d : max), dates[0]);
+        }
+
+        async function loadPriceTiers() {
+            try {
+                const tiers = await api('/price-tiers/admin/all');
+
+                if (!Array.isArray(tiers) || tiers.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; color: var(--muted); padding: 40px;">Chưa có bảng giá nào.</p>';
+                    return;
+                }
+
+                const latestDate = getLatestUpdateDate(tiers);
+
+                let html = '<h3 style="margin-bottom: 8px;">📊 Bảng giá điện hiện hành</h3>';
+                html += '<p style="color: var(--muted); margin-bottom: 16px; font-size: 14px;">Ngày cập nhật: <strong>' + formatDate(latestDate) + '</strong></p>';
+                html += '<table class="data-table"><thead><tr>';
+                html += '<th>Bậc</th><th>Khoảng (kWh)</th><th>Đơn giá (đ/kWh)</th><th>Thao tác</th>';
+                html += '</tr></thead><tbody>';
+
+                tiers.forEach(function(tier) {
+                    const range = tier.kwh_to === null
+                        ? 'Từ ' + tier.kwh_from + ' trở lên'
+                        : tier.kwh_from + ' - ' + tier.kwh_to;
+
+                    html += '<tr>';
+                    html += '<td><strong>Bậc ' + tier.tier_no + '</strong></td>';
+                    html += '<td>' + range + '</td>';
+                    html += '<td><strong style="color: var(--primary);">' + tier.unit_price.toLocaleString('vi-VN') + '</strong></td>';
+                    html += '<td><button class="button small primary" onclick="openEditModal(' + tier.id + ', ' + tier.tier_no + ', \'' + range + '\', ' + tier.unit_price + ')">Sửa giá</button></td>';
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+
+                container.innerHTML = html;
+            } catch (err) {
+                errorDiv.textContent = err.message || 'Không thể tải bảng giá';
+                errorDiv.style.display = 'block';
+
+                if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+                    setTimeout(function() { location.href = '/auth/admin_login.html'; }, 2000);
+                }
+            }
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('vi-VN');
+        }
+
+        window.openEditModal = function(tierId, tierNo, range, currentPrice) {
+            document.getElementById('edit-tier-id').value = tierId;
+            document.getElementById('edit-tier-info').value = 'Bậc ' + tierNo + ': ' + range;
+            document.getElementById('edit-unit-price').value = currentPrice;
+
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('edit-effective-from').value = today;
+            document.getElementById('edit-effective-from').min = today;
+
+            modal.classList.add('show');
+        };
+
+        window.closeEditModal = function() {
+            modal.classList.remove('show');
+            editForm.reset();
+        };
+
+        editForm.onsubmit = async function(e) {
+            e.preventDefault();
+            saveText.style.display = 'none';
+            saveSpinner.style.display = 'inline-block';
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+
+            const tierId = document.getElementById('edit-tier-id').value;
+            const unitPrice = parseInt(document.getElementById('edit-unit-price').value);
+            const effectiveFrom = document.getElementById('edit-effective-from').value;
+
+            try {
+                await api('/price-tiers/admin/' + tierId, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        unit_price: unitPrice,
+                        effective_from: effectiveFrom
+                    })
+                });
+
+                toastSuccess('Đã cập nhật giá', `Bậc ${tierId}: ${unitPrice.toLocaleString('vi-VN')} đ/kWh`);
+                closeEditModal();
+                await loadPriceTiers();
+            } catch (err) {
+                toastError('Cập nhật giá thất bại', err.message || 'Vui lòng thử lại.');
+            } finally {
+                saveText.style.display = 'inline-block';
+                saveSpinner.style.display = 'none';
+            }
+        };
+
+        modal.onclick = function(e) {
+            if (e.target === modal) {
+                closeEditModal();
+            }
+        };
+
+        loadPriceTiers();
+    </script>
+</body>
+</html>

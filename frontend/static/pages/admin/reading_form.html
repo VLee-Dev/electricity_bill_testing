@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nhập chỉ số điện - Điện nhà mình</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div data-appbar-placeholder></div>
+    <main>
+        <div id="error-message" style="display: none;" class="alert error"></div>
+        <div id="success-message" style="display: none;" class="alert success"></div>
+
+        <section class="panel" style="max-width: 700px; margin: 40px auto;">
+            <h1>📊 Nhập chỉ số điện</h1>
+            <p style="color: var(--muted); margin-bottom: 32px;">Ghi nhận chỉ số đồng hồ điện mới</p>
+
+            <form id="reading-form">
+                <div class="form-group">
+                    <label for="household-id">Chọn hộ *</label>
+                    <select id="household-id" required>
+                        <option value="">Đang tải...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="period">Kỳ hóa đơn *</label>
+                    <input id="period" type="text" placeholder="2026-09" required>
+                    <small>Định dạng: YYYY-MM (ví dụ: 2026-09)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="new-reading">Chỉ số mới *</label>
+                    <input id="new-reading" type="number" min="0" placeholder="1250" required>
+                    <small>Chỉ số hiện tại trên đồng hồ điện (kWh)</small>
+                </div>
+
+                <button type="submit" class="button primary" style="width: 100%; margin-top: 16px;">
+                    <span id="btn-text">Lưu chỉ số</span>
+                    <span id="btn-spinner" style="display: none;" class="spinner"></span>
+                </button>
+            </form>
+        </section>
+    </main>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/appbar.js"></script>
+    <script>
+        requireAuth();
+        mountAppbar('admin');
+
+        const form = document.getElementById('reading-form');
+        const errorDiv = document.getElementById('error-message');
+        const successDiv = document.getElementById('success-message');
+        const btnText = document.getElementById('btn-text');
+        const btnSpinner = document.getElementById('btn-spinner');
+
+        async function loadHouseholds() {
+            try {
+                const households = await api('/admin/households');
+
+                if (!Array.isArray(households)) {
+                    throw new Error('API không trả về mảng dữ liệu');
+                }
+
+                const select = document.getElementById('household-id');
+                select.innerHTML = '<option value="">-- Chọn hộ --</option>' +
+                    households.map(h => '<option value="' + h.id + '">' + h.customer_code + ' - ' + h.full_name + '</option>').join('');
+            } catch (err) {
+                errorDiv.textContent = err.message || 'Không thể tải danh sách hộ';
+                errorDiv.style.display = 'block';
+
+                if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+                    setTimeout(function() { location.href = '/auth/admin_login.html'; }, 2000);
+                }
+            }
+        }
+
+        form.onsubmit = async function(e) {
+            e.preventDefault();
+            btnText.style.display = 'none';
+            btnSpinner.style.display = 'inline-block';
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+
+            try {
+                const reading = await api('/admin/meter-readings', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        household_id: document.getElementById('household-id').value,
+                        period: document.getElementById('period').value.trim(),
+                        new_reading: Number(document.getElementById('new-reading').value)
+                    })
+                });
+
+                toastSuccess('Đã lưu chỉ số', `Tiêu thụ: ${reading.consumption} kWh`);
+                setTimeout(function() {
+                    location.href = '/admin/meter_readings.html';
+                }, 1200);
+            } catch (err) {
+                toastError('Lưu chỉ số thất bại', err.message || 'Vui lòng thử lại.');
+                btnText.style.display = 'inline-block';
+                btnSpinner.style.display = 'none';
+            }
+        };
+
+        loadHouseholds();
+    </script>
+</body>
+</html>

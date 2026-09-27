@@ -1,0 +1,42 @@
+# AI Context files - KHÔNG commit
+AI_CONTEXT.md
+AI_RULES.md
+PROJECT_SPEC.md
+LUONG_XU_LY_HE_THONG_LOCAL.md
+PROJECT_DOCUMENTATION.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+*.log

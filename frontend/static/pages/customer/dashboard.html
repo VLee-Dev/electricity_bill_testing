@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard - Điện nhà mình</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div data-appbar-placeholder></div>
+    <main>
+        <div id="error-message" style="display: none;" class="alert error"></div>
+
+        <section class="panel">
+            <h1>Xin chào, <span id="customer-name">Khách hàng</span> 👋</h1>
+            <p style="color: var(--muted); margin-bottom: 32px;">Thông tin tài khoản và hóa đơn của bạn</p>
+
+            <div id="household-info" style="background: var(--page); border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-bottom: 32px;">
+                <div style="text-align: center; padding: 20px;">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2 style="margin-bottom: 20px;">📄 Hóa đơn gần đây</h2>
+            <div id="recent-invoices">
+                <div style="text-align: center; padding: 40px;">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/appbar.js"></script>
+    <script>
+        requireAuth();
+        mountAppbar('customer');
+
+        async function load() {
+            try {
+                const household = await api('/customer/auth/me/household');
+
+                document.getElementById('customer-name').textContent = household.full_name;
+                document.getElementById('household-info').innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                        <div>
+                            <div style="font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Mã khách hàng</div>
+                            <div style="font-size: 18px; font-weight: 600; color: var(--primary-light);">${household.customer_code}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Số đồng hồ</div>
+                            <div style="font-size: 18px; font-weight: 600; font-family: monospace; color: var(--ink);">${household.meter_number}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Địa chỉ</div>
+                            <div style="font-size: 16px; font-weight: 500; color: var(--ink);">${household.address}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Điện thoại</div>
+                            <div style="font-size: 16px; font-weight: 500; color: var(--ink);">${household.phone || 'Chưa có'}</div>
+                        </div>
+                    </div>
+                `;
+
+                const invoices = await api('/customer/invoices');
+                const recent = invoices.slice(0, 5);
+
+                if (recent.length === 0) {
+                    document.getElementById('recent-invoices').innerHTML = '<p style="text-align: center; color: var(--muted); padding: 40px;">Chưa có hóa đơn nào</p>';
+                } else {
+                    document.getElementById('recent-invoices').innerHTML = `
+                        <div class="invoice-grid">
+                            ${recent.map(inv => {
+                                const dueDate = new Date(inv.due_date);
+                                const today = new Date();
+                                const isOverdue = inv.status === 'unpaid' && dueDate < today;
+                                const displayStatus = isOverdue ? 'overdue' : inv.status;
+
+                                return `
+                                    <div class="invoice-card" onclick="location.href='/customer/invoice_detail.html?id=${inv.id}'" style="cursor: pointer;">
+                                        <div class="invoice-header">
+                                            <div class="invoice-period">Kỳ ${inv.meter_reading?.period || 'N/A'}</div>
+                                            <span class="badge ${displayStatus}">${
+                                                displayStatus === 'paid' ? 'Đã thanh toán' :
+                                                displayStatus === 'overdue' ? 'Quá hạn' : 'Chưa thanh toán'
+                                            }</span>
+                                        </div>
+                                        <div class="invoice-body">
+                                            <div class="invoice-row">
+                                                <span>Tiêu thụ</span>
+                                                <strong>${inv.meter_reading?.consumption || 0} kWh</strong>
+                                            </div>
+                                            <div class="invoice-row">
+                                                <span>Tiền điện</span>
+                                                <span>${(inv.subtotal || 0).toLocaleString('vi-VN')} đ</span>
+                                            </div>
+                                            <div class="invoice-row">
+                                                <span>VAT (8%)</span>
+                                                <span>${(inv.vat_amount || 0).toLocaleString('vi-VN')} đ</span>
+                                            </div>
+                                        </div>
+                                        <div class="invoice-total">
+                                            <span>Tổng cộng</span>
+                                            <span>${(inv.total_amount || 0).toLocaleString('vi-VN')} đ</span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = err.message || 'Không thể tải dữ liệu';
+                errorDiv.style.display = 'block';
+
+                if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+                    setTimeout(() => location.href = '/auth/customer_login.html', 2000);
+                }
+            }
+        }
+        load();
+    </script>
+</body>
+</html>

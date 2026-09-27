@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard Admin - Điện nhà mình</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div data-appbar-placeholder></div>
+    <main>
+        <div id="error-message" style="display: none;" class="alert error"></div>
+
+        <section class="panel">
+            <h1>Xin chào, <span id="admin-name">Admin</span> 👋</h1>
+            <p style="color: var(--muted); margin-bottom: 32px;">Tổng quan hệ thống quản lý tiền điện</p>
+
+            <div class="stats-grid" id="stats">
+                <div class="stat-card">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2 style="margin-bottom: 20px;">📊 Hóa đơn gần đây</h2>
+            <div id="recent-invoices">
+                <div style="text-align: center; padding: 40px;">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/appbar.js"></script>
+    <script>
+        requireAuth();
+        mountAppbar('admin');
+
+        async function loadDashboard() {
+            try {
+                const me = await api('/admin/auth/me');
+                document.getElementById('admin-name').textContent = me.full_name || me.username;
+
+                const [households, invoices] = await Promise.all([
+                    api('/admin/households'),
+                    api('/admin/invoices')
+                ]);
+
+                const unpaidInvoices = invoices.filter(inv => inv.status === 'unpaid');
+                const totalRevenue = invoices
+                    .filter(inv => inv.status === 'paid')
+                    .reduce((sum, inv) => sum + inv.total_amount, 0);
+
+                document.getElementById('stats').innerHTML = `
+                    <div class="stat-card">
+                        <div style="font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Tổng số hộ</div>
+                        <div style="font-size: 36px; font-weight: 700; color: var(--ink);">${households.length}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Hóa đơn</div>
+                        <div style="font-size: 36px; font-weight: 700; color: var(--ink);">${invoices.length}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Chưa thanh toán</div>
+                        <div style="font-size: 36px; font-weight: 700; color: var(--accent);">${unpaidInvoices.length}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Doanh thu</div>
+                        <div style="font-size: 36px; font-weight: 700; color: var(--success);">${(totalRevenue / 1000000).toFixed(1)}M đ</div>
+                    </div>
+                `;
+
+                const recentInvoices = invoices.slice(0, 5);
+                if (recentInvoices.length === 0) {
+                    document.getElementById('recent-invoices').innerHTML = '<p style="text-align: center; color: var(--muted); padding: 40px;">Chưa có hóa đơn nào</p>';
+                } else {
+                    document.getElementById('recent-invoices').innerHTML = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Kỳ</th>
+                                    <th>Khách hàng</th>
+                                    <th>Tiêu thụ</th>
+                                    <th>Tổng tiền</th>
+                                    <th>Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${recentInvoices.map(inv => {
+                                    const dueDate = new Date(inv.due_date);
+                                    const today = new Date();
+                                    const isOverdue = inv.status === 'unpaid' && dueDate < today;
+                                    const displayStatus = isOverdue ? 'overdue' : inv.status;
+
+                                    return `
+                                        <tr onclick="location.href='/admin/invoice_detail.html?id=${inv.id}'" style="cursor: pointer;">
+                                            <td>${inv.meter_reading?.period || '-'}</td>
+                                            <td><strong style="color: var(--primary-light);">${inv.household?.customer_code || '-'}</strong></td>
+                                            <td>${inv.meter_reading?.consumption || 0} kWh</td>
+                                            <td style="font-weight: 600; font-size: 16px;">${(inv.total_amount || 0).toLocaleString('vi-VN')} đ</td>
+                                            <td>
+                                                <span class="badge ${displayStatus}">${
+                                                    displayStatus === 'paid' ? 'Đã thanh toán' :
+                                                    displayStatus === 'overdue' ? 'Quá hạn' : 'Chưa thanh toán'
+                                                }</span>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            } catch (err) {
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = err.message || 'Không thể tải dữ liệu';
+                errorDiv.style.display = 'block';
+
+                if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+                    setTimeout(() => location.href = '/auth/admin_login.html', 2000);
+                }
+            }
+        }
+
+        loadDashboard();
+    </script>
+</body>
+</html>

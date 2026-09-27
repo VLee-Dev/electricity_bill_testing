@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bảng giá điện - Khách hàng</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div data-appbar-placeholder></div>
+    <main>
+        <div id="error-message" style="display: none;" class="alert error"></div>
+
+        <section class="panel" style="max-width: 900px; margin: 40px auto;">
+            <div style="margin-bottom: 24px;">
+                <h1>💰 Biểu giá điện sinh hoạt</h1>
+            </div>
+
+            <div id="price-tiers-container">
+                <div style="text-align: center; padding: 40px; color: var(--muted);">
+                    <span class="spinner"></span>
+                    <p>Đang tải bảng giá...</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/appbar.js"></script>
+    <script>
+        requireAuth();
+        mountAppbar('customer');
+
+        const errorDiv = document.getElementById('error-message');
+        const container = document.getElementById('price-tiers-container');
+
+        async function loadPriceTiers() {
+            try {
+                const tiers = await api('/price-tiers/active');
+
+                if (!Array.isArray(tiers) || tiers.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; color: var(--muted); padding: 40px;">Chưa có bảng giá.</p>';
+                    return;
+                }
+
+                let html = '<table class="data-table"><thead><tr>';
+                html += '<th style="text-align: center;">Bậc</th>';
+                html += '<th>Khoảng sử dụng (kWh)</th>';
+                html += '<th style="text-align: right;">Đơn giá (đ/kWh)</th>';
+                html += '</tr></thead><tbody>';
+
+                tiers.forEach(function(tier) {
+                    const range = tier.kwh_to === null
+                        ? 'Từ ' + tier.kwh_from + ' trở lên'
+                        : tier.kwh_from + ' - ' + tier.kwh_to;
+
+                    html += '<tr>';
+                    html += '<td style="text-align: center;"><strong style="font-size: 18px; color: var(--primary);">Bậc ' + tier.tier_no + '</strong></td>';
+                    html += '<td>' + range + '</td>';
+                    html += '<td style="text-align: right;"><strong style="font-size: 16px;">' + tier.unit_price.toLocaleString('vi-VN') + '</strong></td>';
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+
+                container.innerHTML = html;
+            } catch (err) {
+                errorDiv.textContent = err.message || 'Không thể tải bảng giá';
+                errorDiv.style.display = 'block';
+
+                if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+                    setTimeout(function() { location.href = '/auth/login.html'; }, 2000);
+                }
+            }
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('vi-VN');
+        }
+
+        loadPriceTiers();
+    </script>
+</body>
+</html>

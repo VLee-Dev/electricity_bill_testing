@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hóa đơn của tôi - Điện nhà mình</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div data-appbar-placeholder></div>
+    <main>
+        <div id="error-message" style="display: none;" class="alert error"></div>
+
+        <section class="panel">
+            <h1>📄 Danh sách hóa đơn điện</h1>
+            <p style="color: var(--muted); margin-bottom: 24px;">Xem và thanh toán hóa đơn tiền điện của bạn</p>
+
+            <div id="loading" style="text-align: center; padding: 40px;">
+                <div class="spinner"></div>
+            </div>
+
+            <div id="invoices-container" style="display: none;"></div>
+        </section>
+    </main>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/appbar.js"></script>
+    <script>
+        requireAuth();
+        mountAppbar('customer');
+
+        async function loadInvoices() {
+            try {
+                const invoices = await api('/customer/invoices');
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('invoices-container').style.display = 'block';
+
+                if (invoices.length === 0) {
+                    document.getElementById('invoices-container').innerHTML = `
+                        <p style="text-align: center; color: var(--muted); padding: 40px;">
+                            Chưa có hóa đơn nào
+                        </p>
+                    `;
+                    return;
+                }
+
+                const sortedInvoices = invoices.sort((a, b) =>
+                    new Date(b.issued_at) - new Date(a.issued_at)
+                );
+
+                document.getElementById('invoices-container').innerHTML = `
+                    <div class="invoice-grid">
+                        ${sortedInvoices.map(inv => {
+                            const dueDate = new Date(inv.due_date);
+                            const today = new Date();
+                            const isOverdue = inv.status === 'unpaid' && dueDate < today;
+                            const displayStatus = isOverdue ? 'overdue' : inv.status;
+
+                            return `
+                                <div class="invoice-card" onclick="viewInvoice('${inv.id}')">
+                                    <div class="invoice-header">
+                                        <div class="invoice-period">Kỳ ${inv.meter_reading?.period || 'N/A'}</div>
+                                        <span class="badge ${displayStatus}">${
+                                            displayStatus === 'paid' ? 'Đã thanh toán' :
+                                            displayStatus === 'overdue' ? 'Quá hạn' : 'Chưa thanh toán'
+                                        }</span>
+                                    </div>
+                                    <div class="invoice-body">
+                                        <div class="invoice-row">
+                                            <span>Tiêu thụ</span>
+                                            <strong>${inv.meter_reading?.consumption || 0} kWh</strong>
+                                        </div>
+                                        <div class="invoice-row">
+                                            <span>Tiền điện</span>
+                                            <span>${(inv.subtotal || 0).toLocaleString('vi-VN')} đ</span>
+                                        </div>
+                                        <div class="invoice-row">
+                                            <span>VAT (8%)</span>
+                                            <span>${(inv.vat_amount || 0).toLocaleString('vi-VN')} đ</span>
+                                        </div>
+                                    </div>
+                                    <div class="invoice-total">
+                                        <span>Tổng cộng</span>
+                                        <span>${(inv.total_amount || 0).toLocaleString('vi-VN')} đ</span>
+                                    </div>
+                                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px;">
+                                        Hạn thanh toán: ${dueDate.toLocaleDateString('vi-VN')}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            } catch (err) {
+                document.getElementById('loading').style.display = 'none';
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = err.message || 'Không thể tải danh sách hóa đơn';
+                errorDiv.style.display = 'block';
+
+                if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+                    setTimeout(() => location.href = '/auth/customer_login.html', 2000);
+                }
+            }
+        }
+
+        function viewInvoice(id) {
+            location.href = `/customer/invoice_detail.html?id=${id}`;
+        }
+
+        loadInvoices();
+    </script>
+</body>
+</html>

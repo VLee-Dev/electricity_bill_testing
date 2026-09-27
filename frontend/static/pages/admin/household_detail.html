@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chi tiết hộ - Điện nhà mình</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div data-appbar-placeholder></div>
+    <main>
+        <div id="error-message" style="display: none;" class="alert error"></div>
+
+        <div id="loading" style="text-align: center; padding: 80px;">
+            <div class="spinner"></div>
+        </div>
+
+        <div id="household-container" style="display: none;">
+            <section class="panel">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 32px;">
+                    <div>
+                        <h1 id="household-name" style="margin-bottom: 8px;">Hộ sử dụng điện</h1>
+                        <p id="customer-code" style="color: var(--primary-light); font-size: 18px; font-weight: 600; margin-bottom: 12px;"></p>
+                        <span id="status-badge"></span>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 32px; padding: 24px; background: var(--page); border: 1px solid var(--line); border-radius: 12px;">
+                    <div>
+                        <div style="font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Địa chỉ</div>
+                        <div id="address" style="font-size: 16px; font-weight: 500; color: var(--ink);"></div>
+                    </div>
+                    <div>
+                        <div style="font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Số điện thoại</div>
+                        <div id="phone" style="font-size: 16px; font-weight: 500; color: var(--ink);"></div>
+                    </div>
+                    <div>
+                        <div style="font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Email</div>
+                        <div id="email" style="font-size: 16px; font-weight: 500; color: var(--ink);"></div>
+                    </div>
+                    <div>
+                        <div style="font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Số đồng hồ</div>
+                        <div id="meter-number" style="font-size: 18px; font-weight: 600; font-family: monospace; color: var(--primary-light);"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2 style="margin-bottom: 20px;">📊 Lịch sử chỉ số điện</h2>
+                <div id="readings-section">
+                    <div style="text-align: center; padding: 40px;">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2 style="margin-bottom: 20px;">📄 Lịch sử hóa đơn</h2>
+                <div id="invoices-section">
+                    <div style="text-align: center; padding: 40px;">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/appbar.js"></script>
+    <script>
+        requireAuth();
+        mountAppbar('admin');
+        const householdId = new URLSearchParams(location.search).get('id');
+
+        async function loadHousehold() {
+            try {
+                const household = await api(`/admin/households/${householdId}`);
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('household-container').style.display = 'block';
+
+                // Basic info
+                document.getElementById('household-name').textContent = household.full_name;
+                document.getElementById('customer-code').textContent = `Mã KH: ${household.customer_code}`;
+                document.getElementById('status-badge').innerHTML = `
+                    <span class="badge ${household.status}">${household.status === 'active' ? 'Hoạt động' : 'Ngưng'}</span>
+                `;
+
+                document.getElementById('address').textContent = household.address;
+                document.getElementById('phone').textContent = household.phone || '-';
+                document.getElementById('email').textContent = household.email || '-';
+                document.getElementById('meter-number').textContent = household.meter_number;
+
+                // Load readings
+                loadReadings(householdId);
+                // Load invoices
+                loadInvoices(householdId);
+            } catch (err) {
+                document.getElementById('loading').style.display = 'none';
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = err.message || 'Không thể tải thông tin hộ';
+                errorDiv.style.display = 'block';
+
+                if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+                    setTimeout(() => location.href = '/auth/admin_login.html', 2000);
+                }
+            }
+        }
+
+        async function loadReadings(householdId) {
+            try {
+                const allReadings = await api('/admin/meter-readings');
+                const readings = allReadings.filter(r => r.household_id === householdId);
+
+                if (readings.length === 0) {
+                    document.getElementById('readings-section').innerHTML = '<p style="text-align: center; color: var(--muted); padding: 40px;">Chưa có chỉ số nào</p>';
+                    return;
+                }
+
+                document.getElementById('readings-section').innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kỳ</th>
+                                <th>Chỉ số cũ</th>
+                                <th>Chỉ số mới</th>
+                                <th>Tiêu thụ</th>
+                                <th>Ngày ghi</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${readings.map(r => `
+                                <tr>
+                                    <td><strong>${r.period}</strong></td>
+                                    <td>${r.old_reading}</td>
+                                    <td><strong>${r.new_reading}</strong></td>
+                                    <td style="font-size: 16px; font-weight: 600;">${r.consumption} kWh</td>
+                                    <td>${new Date(r.recorded_at).toLocaleDateString('vi-VN')}</td>
+                                    <td>
+                                        ${r.has_invoice ?
+                                            '<span class="badge paid">✓ Đã tính hóa đơn</span>' :
+                                            '<span class="badge unpaid">Chưa tính</span>'
+                                        }
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (err) {
+                document.getElementById('readings-section').innerHTML = '<p style="color: var(--muted);">Không thể tải lịch sử chỉ số</p>';
+            }
+        }
+
+        async function loadInvoices(householdId) {
+            try {
+                const allInvoices = await api('/admin/invoices');
+                const invoices = allInvoices.filter(inv => inv.household_id === householdId);
+
+                if (invoices.length === 0) {
+                    document.getElementById('invoices-section').innerHTML = '<p style="text-align: center; color: var(--muted); padding: 40px;">Chưa có hóa đơn nào</p>';
+                    return;
+                }
+
+                document.getElementById('invoices-section').innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kỳ</th>
+                                <th>Tiêu thụ</th>
+                                <th>Tổng tiền</th>
+                                <th>Trạng thái</th>
+                                <th>Hạn thanh toán</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${invoices.map(inv => {
+                                const dueDate = new Date(inv.due_date);
+                                const today = new Date();
+                                const isOverdue = inv.status === 'unpaid' && dueDate < today;
+                                const displayStatus = isOverdue ? 'overdue' : inv.status;
+
+                                return `
+                                    <tr>
+                                        <td><strong>${inv.meter_reading?.period || 'N/A'}</strong></td>
+                                        <td>${inv.meter_reading?.consumption || 0} kWh</td>
+                                        <td style="font-size: 16px; font-weight: 600;">${(inv.total_amount || 0).toLocaleString('vi-VN')} đ</td>
+                                        <td>
+                                            <span class="badge ${displayStatus}">${
+                                                displayStatus === 'paid' ? 'Đã thanh toán' :
+                                                displayStatus === 'overdue' ? 'Quá hạn' : 'Chưa thanh toán'
+                                            }</span>
+                                        </td>
+                                        <td>${dueDate.toLocaleDateString('vi-VN')}</td>
+                                        <td><a href="/admin/invoice_detail.html?id=${inv.id}" class="button primary" style="padding: 8px 16px; font-size: 14px;">Chi tiết</a></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (err) {
+                document.getElementById('invoices-section').innerHTML = '<p style="color: var(--muted);">Không thể tải lịch sử hóa đơn</p>';
+            }
+        }
+
+        loadHousehold();
+    </script>
+</body>
+</html>

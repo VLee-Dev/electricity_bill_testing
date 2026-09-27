@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quản lý hộ - Điện nhà mình</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .modal {
+            display: none;
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: var(--panel); padding: 32px; border-radius: 12px;
+            max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;
+        }
+        .modal-row { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+        .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .row-actions button { padding: 6px 12px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div data-appbar-placeholder></div>
+    <main>
+        <div id="error-message" style="display: none;" class="alert error"></div>
+        <div id="success-message" style="display: none;" class="alert success"></div>
+
+        <section class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h1>Danh sách hộ</h1>
+                <button onclick="location.href='/admin/household_register.html'" class="button primary">
+                    + Đăng ký hộ mới
+                </button>
+            </div>
+
+            <div class="search-bar">
+                <input id="search" type="search" placeholder="🔍 Tìm theo tên, mã KH, số đồng hồ, SĐT, địa chỉ...">
+                <button id="search-btn" class="button primary" style="padding: 8px 20px;">🔍 Tìm</button>
+                <button id="clear-btn" class="button secondary" style="padding: 8px 16px;">↺ Reset</button>
+                <span id="search-hint" style="margin-left: 16px; color: var(--muted); font-size: 13px;">
+                    (tìm trong tối đa <strong id="result-count">0</strong> hộ)
+                </span>
+            </div>
+
+            <div id="loading" style="text-align: center; padding: 40px;">
+                <div class="spinner"></div>
+            </div>
+
+            <table id="households-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Mã KH</th>
+                        <th>Họ tên</th>
+                        <th>Địa chỉ</th>
+                        <th>Số điện thoại</th>
+                        <th>Số đồng hồ</th>
+                        <th>Trạng thái</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="households"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <!-- Modal: Sửa hộ -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <h2>Sửa thông tin hộ</h2>
+            <p style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">
+                Không thể sửa <strong>mã KH</strong> và <strong>số công tơ</strong> (giữ ổn định FK).
+            </p>
+            <form id="edit-form">
+                <input type="hidden" id="edit-id">
+
+                <div class="form-group">
+                    <label>Mã KH (chỉ đọc)</label>
+                    <input id="edit-customer-code" type="text" readonly disabled>
+                </div>
+                <div class="form-group">
+                    <label>Số công tơ (chỉ đọc)</label>
+                    <input id="edit-meter-number" type="text" readonly disabled>
+                </div>
+                <div class="form-group">
+                    <label for="edit-full-name">Họ tên <span style="color: red;">*</span></label>
+                    <input id="edit-full-name" type="text" required minlength="1" maxlength="255">
+                </div>
+                <div class="form-group">
+                    <label for="edit-address">Địa chỉ <span style="color: red;">*</span></label>
+                    <input id="edit-address" type="text" required minlength="1" maxlength="500">
+                </div>
+                <div class="form-group">
+                    <label for="edit-phone">Số điện thoại <span style="color: red;">*</span></label>
+                    <input id="edit-phone" type="tel" required minlength="10" maxlength="20" pattern="[0-9]+">
+                </div>
+                <div class="form-group">
+                    <label for="edit-email">Email <span style="color: red;">*</span></label>
+                    <input id="edit-email" type="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-status">Trạng thái</label>
+                    <select id="edit-status">
+                        <option value="active">Hoạt động</option>
+                        <option value="inactive">Ngưng</option>
+                    </select>
+                </div>
+
+                <div id="edit-error" class="alert error" style="display: none; margin-bottom: 16px;"></div>
+
+                <div class="modal-row">
+                    <button type="button" class="button secondary" onclick="closeEditModal()">Hủy</button>
+                    <button type="submit" class="button primary">
+                        <span id="edit-btn-text">Lưu thay đổi</span>
+                        <span id="edit-btn-spinner" style="display:none;" class="spinner"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/appbar.js"></script>
+    <script>
+        requireAuth();
+        mountAppbar('admin');
+        let allHouseholds = [];
+
+        async function loadHouseholds() {
+            try {
+                allHouseholds = await api('/admin/households');
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('households-table').style.display = 'table';
+                renderHouseholds(allHouseholds);
+            } catch (err) {
+                document.getElementById('loading').style.display = 'none';
+                showError(err.message || 'Không thể tải danh sách hộ');
+            }
+        }
+
+        function renderHouseholds(list) {
+            const tbody = document.getElementById('households');
+            document.getElementById('result-count').textContent = list.length;
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 40px;">Không tìm thấy hộ nào</td></tr>';
+                return;
+            }
+            tbody.innerHTML = list.map(h => `
+                <tr>
+                    <td><strong style="color: var(--primary-light); cursor: pointer;" onclick="viewHousehold('${h.id}')">${h.customer_code}</strong></td>
+                    <td style="cursor: pointer;" onclick="viewHousehold('${h.id}')">${h.full_name}</td>
+                    <td style="cursor: pointer;" onclick="viewHousehold('${h.id}')">${h.address}</td>
+                    <td style="cursor: pointer;" onclick="viewHousehold('${h.id}')">${h.phone || '-'}</td>
+                    <td style="cursor: pointer;" onclick="viewHousehold('${h.id}')"><code style="background: var(--page); padding: 4px 8px; border-radius: 4px;">${h.meter_number}</code></td>
+                    <td style="cursor: pointer;" onclick="viewHousehold('${h.id}')">
+                        <span class="badge ${h.status}">${h.status === 'active' ? 'Hoạt động' : 'Ngưng'}</span>
+                    </td>
+                    <td>
+                        <div class="row-actions">
+                            <button class="button secondary" onclick="openEditModal('${h.id}')">Sửa</button>
+                            <button class="button danger" onclick="deleteHousehold('${h.id}', '${h.customer_code}', '${h.full_name.replace(/'/g, "\\'")}')"
+                                ${h.status === 'inactive' ? 'disabled title="Hộ đã ngưng"' : ''}>
+                                ${h.status === 'inactive' ? 'Đã ngưng' : 'Ngưng'}
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function viewHousehold(id) {
+            location.href = `/admin/household_detail.html?id=${id}`;
+        }
+
+        // === Search (client-side filter theo input, có nút "Tìm" + "Reset") ===
+        const $search = document.getElementById('search');
+        function runSearch() {
+            const term = $search.value.trim().toLowerCase();
+            if (!term) {
+                renderHouseholds(allHouseholds);
+                return;
+            }
+            const filtered = allHouseholds.filter(h =>
+                h.customer_code.toLowerCase().includes(term) ||
+                h.full_name.toLowerCase().includes(term) ||
+                h.meter_number.toLowerCase().includes(term) ||
+                (h.phone && h.phone.includes(term)) ||
+                h.address.toLowerCase().includes(term)
+            );
+            renderHouseholds(filtered);
+        }
+        $search.addEventListener('input', runSearch);
+        $search.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runSearch(); } });
+        document.getElementById('search-btn').addEventListener('click', runSearch);
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            $search.value = '';
+            renderHouseholds(allHouseholds);
+        });
+
+        // === Modal Sửa ===
+        function openEditModal(id) {
+            const h = allHouseholds.find(x => x.id === id);
+            if (!h) return;
+            document.getElementById('edit-id').value = h.id;
+            document.getElementById('edit-customer-code').value = h.customer_code;
+            document.getElementById('edit-meter-number').value = h.meter_number;
+            document.getElementById('edit-full-name').value = h.full_name;
+            document.getElementById('edit-address').value = h.address;
+            document.getElementById('edit-phone').value = h.phone;
+            document.getElementById('edit-email').value = h.email;
+            document.getElementById('edit-status').value = h.status;
+            document.getElementById('edit-error').style.display = 'none';
+            document.getElementById('edit-modal').classList.add('show');
+        }
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.remove('show');
+        }
+        document.getElementById('edit-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'edit-modal') closeEditModal();
+        });
+
+        document.getElementById('edit-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            const btnText = document.getElementById('edit-btn-text');
+            const btnSpinner = document.getElementById('edit-btn-spinner');
+            const errBox = document.getElementById('edit-error');
+            btnText.style.display = 'none';
+            btnSpinner.style.display = 'inline-block';
+            errBox.style.display = 'none';
+
+            const body = {
+                full_name: document.getElementById('edit-full-name').value.trim(),
+                address: document.getElementById('edit-address').value.trim(),
+                phone: document.getElementById('edit-phone').value.trim(),
+                email: document.getElementById('edit-email').value.trim(),
+                status: document.getElementById('edit-status').value
+            };
+
+            try {
+                const updated = await api(`/admin/households/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+                toastSuccess('Đã cập nhật', `Hộ ${updated.customer_code} đã được cập nhật.`);
+                closeEditModal();
+                loadHouseholds();
+            } catch (err) {
+                btnText.style.display = 'inline-block';
+                btnSpinner.style.display = 'none';
+                errBox.textContent = err.message || 'Cập nhật thất bại';
+                errBox.style.display = 'block';
+            }
+        });
+
+        // === Xóa (soft = set status=inactive) ===
+        async function deleteHousehold(id, code, name) {
+            const ok = await toastConfirm(
+                'Ngưng hộ này?',
+                `Hộ "${code} — ${name}" sẽ được chuyển sang trạng thái NGƯNG (không xóa row, giữ lịch sử). KHÔNG thể ngưng nếu còn hóa đơn CHƯA THANH TOÁN.`,
+                'Ngưng hộ',
+                'Hủy'
+            );
+            if (!ok) return;
+
+            try {
+                const result = await api(`/admin/households/${id}`, { method: 'DELETE' });
+                toastSuccess('Đã ngưng hộ', result.message || `Hộ ${code} đã chuyển sang inactive.`);
+                loadHouseholds();
+            } catch (err) {
+                toastError('Ngưng hộ thất bại', err.message || 'Có thể hộ còn hóa đơn chưa thanh toán.');
+            }
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('error-message');
+            el.textContent = msg;
+            el.style.display = 'block';
+            if (msg.includes('401') || msg.includes('Unauthorized')) {
+                setTimeout(() => location.href = '/auth/admin_login.html', 2000);
+            }
+        }
+
+        loadHouseholds();
+    </script>
+</body>
+</html>
