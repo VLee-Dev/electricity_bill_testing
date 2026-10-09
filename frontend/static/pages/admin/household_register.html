@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="vi">
 <head>
@@ -8,64 +9,171 @@
 </head>
 <body>
     <div data-appbar-placeholder></div>
-    <main>
-        <div id="error-message" style="display: none;" class="alert error"></div>
-        <div id="success-message" style="display: none;" class="alert success"></div>
 
-        <section class="panel" style="max-width: 700px; margin: 40px auto;">
+    <main>
+        <div id="error-message"
+             style="display: none;"
+             class="alert error"></div>
+
+        <div id="success-message"
+             style="display: none;"
+             class="alert success"></div>
+
+        <section class="panel"
+                 style="max-width: 700px; margin: 40px auto;">
+
             <h1>📋 Đăng ký hộ mới</h1>
-            <p style="color: var(--muted); margin-bottom: 32px;">Nhập thông tin khách hàng sử dụng điện</p>
+
+            <p style="color: var(--muted); margin-bottom: 32px;">
+                Nhập thông tin khách hàng sử dụng điện
+            </p>
 
             <form id="register-form">
+
                 <div class="form-group">
-                    <label for="customer-code">Mã khách hàng *</label>
-                    <input id="customer-code" type="text" placeholder="VD: KH001" required autofocus>
-                    <small>Mã định danh duy nhất cho khách hàng</small>
+                    <label for="customer-code">
+                        Mã khách hàng *
+                    </label>
+
+                    <input
+                        id="customer-code"
+                        type="text"
+                        placeholder="VD: KH001"
+                        minlength="3"
+                        maxlength="50"
+                        required
+                        autofocus
+                    >
+
+                    <small>
+                        Mã định danh duy nhất cho khách hàng
+                    </small>
                 </div>
 
                 <div class="form-group">
-                    <label for="full-name">Họ và tên *</label>
-                    <input id="full-name" type="text" placeholder="Nguyễn Văn A" required>
+                    <label for="full-name">
+                        Họ và tên *
+                    </label>
+
+                    <input
+                        id="full-name"
+                        type="text"
+                        placeholder="Nguyễn Văn A"
+                        maxlength="255"
+                        required
+                    >
                 </div>
 
                 <div class="form-group">
-                    <label for="address">Địa chỉ *</label>
-                    <input id="address" type="text" placeholder="123 Đường ABC, Quận X, TP.HCM" required>
+                    <label for="address">
+                        Địa chỉ *
+                    </label>
+
+                    <input
+                        id="address"
+                        type="text"
+                        placeholder="123 Đường ABC, Quận X, TP.HCM"
+                        maxlength="500"
+                        required
+                    >
                 </div>
 
                 <div class="form-group">
-                    <label for="phone">Số điện thoại</label>
-                    <input id="phone" type="tel" placeholder="0912345678">
+                    <label for="phone">
+                        Số điện thoại *
+                    </label>
+
+                    <input
+                        id="phone"
+                        type="tel"
+                        placeholder="0912345678"
+                        minlength="10"
+                        maxlength="20"
+                        required
+                    >
+
+                    <small>
+                        Nhập từ 10 đến 20 ký tự
+                    </small>
                 </div>
 
                 <div class="form-group">
-                    <label for="email">Email</label>
-                    <input id="email" type="email" placeholder="example@email.com">
-                    <small>Email để nhận thông báo hóa đơn tự động</small>
+                    <label for="email">
+                        Email *
+                    </label>
+
+                    <input
+                        id="email"
+                        type="email"
+                        placeholder="example@email.com"
+                        required
+                    >
+
+                    <small>
+                        Email để nhận thông báo hóa đơn tự động
+                    </small>
                 </div>
 
                 <div class="form-group">
-                    <label for="meter-number">Số đồng hồ điện *</label>
-                    <input id="meter-number" type="text" placeholder="VD: MT001" required>
-                    <small>Mã số của đồng hồ điện được lắp đặt</small>
+                    <label for="meter-number">
+                        Số đồng hồ điện *
+                    </label>
+
+                    <input
+                        id="meter-number"
+                        type="text"
+                        placeholder="VD: MT001"
+                        maxlength="50"
+                        required
+                    >
+
+                    <small>
+                        Mã số của đồng hồ điện được lắp đặt
+                    </small>
                 </div>
 
                 <div class="form-group">
-                    <label for="initial-password">Mật khẩu khởi tạo *</label>
-                    <input id="initial-password" type="password" placeholder="Tối thiểu 6 ký tự" required minlength="6">
-                    <small>Mật khẩu cho khách hàng đăng nhập lần đầu</small>
+                    <label for="initial-password">
+                        Mật khẩu khởi tạo *
+                    </label>
+
+                    <input
+                        id="initial-password"
+                        type="password"
+                        placeholder="Tối thiểu 6 ký tự"
+                        minlength="6"
+                        required
+                    >
+
+                    <small>
+                        Mật khẩu cho khách hàng đăng nhập lần đầu
+                    </small>
                 </div>
 
-                <button type="submit" class="button primary" style="width: 100%; margin-top: 16px;">
-                    <span id="btn-text">Đăng ký hộ</span>
-                    <span id="btn-spinner" style="display: none;" class="spinner"></span>
+                <button
+                    id="submit-button"
+                    type="submit"
+                    class="button primary"
+                    style="width: 100%; margin-top: 16px;"
+                >
+                    <span id="btn-text">
+                        Đăng ký hộ
+                    </span>
+
+                    <span
+                        id="btn-spinner"
+                        style="display: none;"
+                        class="spinner"
+                    ></span>
                 </button>
+
             </form>
         </section>
     </main>
 
     <script src="/static/js/api.js"></script>
     <script src="/static/js/appbar.js"></script>
+
     <script>
         requireAuth();
         mountAppbar('admin');
@@ -75,42 +183,86 @@
         const successDiv = document.getElementById('success-message');
         const btnText = document.getElementById('btn-text');
         const btnSpinner = document.getElementById('btn-spinner');
+        const submitButton = document.getElementById('submit-button');
 
-        form.onsubmit = async (e) => {
+        function setLoading(loading) {
+            submitButton.disabled = loading;
+            btnText.style.display = loading ? 'none' : 'inline';
+            btnSpinner.style.display = loading ? 'inline-block' : 'none';
+        }
+
+        function getValue(id) {
+            return document.getElementById(id).value.trim();
+        }
+
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            btnText.style.display = 'none';
-            btnSpinner.style.display = 'inline-block';
+
             errorDiv.style.display = 'none';
             successDiv.style.display = 'none';
+
+            if (!form.reportValidity()) {
+                return;
+            }
+
+            const data = {
+                customer_code: getValue('customer-code'),
+                full_name: getValue('full-name'),
+                address: getValue('address'),
+                phone: getValue('phone'),
+                email: getValue('email'),
+                meter_number: getValue('meter-number'),
+                initial_password:
+                    document.getElementById('initial-password').value
+            };
+
+            setLoading(true);
 
             try {
                 const household = await api('/admin/households', {
                     method: 'POST',
-                    body: JSON.stringify({
-                        customer_code: document.getElementById('customer-code').value.trim(),
-                        full_name: document.getElementById('full-name').value.trim(),
-                        address: document.getElementById('address').value.trim(),
-                        phone: document.getElementById('phone').value.trim() || null,
-                        email: document.getElementById('email').value.trim() || null,
-                        meter_number: document.getElementById('meter-number').value.trim(),
-                        initial_password: document.getElementById('initial-password').value
-                    })
+                    body: JSON.stringify(data)
                 });
 
-                toastSuccess('Đã đăng ký hộ thành công', `Hộ ${household.customer_code} - ${household.full_name}`);
+                const message =
+                    `Hộ ${household.customer_code} - ${household.full_name}`;
+
+                successDiv.textContent =
+                    'Đã đăng ký hộ thành công: ' + message;
+
+                successDiv.style.display = 'block';
+
+                toastSuccess(
+                    'Đã đăng ký hộ thành công',
+                    message
+                );
+
+                form.reset();
+
                 setTimeout(() => {
                     location.href = '/admin/households.html';
                 }, 1200);
-            } catch (err) {
-                toastError('Đăng ký thất bại', err.message || 'Vui lòng kiểm tra lại thông tin.');
-                btnText.style.display = 'inline-block';
-                btnSpinner.style.display = 'none';
 
-                if (err.message.includes('401') || err.message.includes('Unauthorized')) {
-                    setTimeout(() => location.href = '/auth/admin_login.html', 2000);
-                }
+            } catch (err) {
+                const message =
+                    typeof err.message === 'string'
+                        ? err.message
+                        : 'Vui lòng kiểm tra lại thông tin.';
+
+                errorDiv.textContent =
+                    'Đăng ký thất bại: ' + message;
+
+                errorDiv.style.display = 'block';
+
+                toastError(
+                    'Đăng ký thất bại',
+                    message
+                );
+
+            } finally {
+                setLoading(false);
             }
-        };
+        });
     </script>
 </body>
 </html>

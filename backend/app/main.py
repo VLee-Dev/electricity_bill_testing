@@ -1,18 +1,19 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.database import Base, engine
+from app.database import Base
+import app.database as database
 from app.exceptions import DomainError
 
-# Import all models để SQLAlchemy nhận biết
-from app.models import *  # noqa: F403
+from app.models import *  # noqa: F401, F403
 
-# Import routers mới
+# Import routers
 from app.features.admin_auth.router import router as admin_auth_router
 from app.features.billing_new.router import router as billing_router
 from app.features.customer_auth.router import router as customer_auth_router
@@ -22,9 +23,14 @@ from app.features.meter_readings_new.router import router as meter_readings_rout
 from app.features.price_tiers.router import router as price_tiers_router
 
 
+BASE_DIR = Path(__file__).resolve().parents[2]
+FRONTEND_DIR = BASE_DIR / "frontend" / "static"
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    # Sử dụng engine hiện tại, hỗ trợ SQLite khi chạy pytest
+    Base.metadata.create_all(bind=database.engine)
     yield
 
 
@@ -41,11 +47,39 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Mount static files (frontend) - MUST be after middleware and before route handlers
-app.mount("/static", StaticFiles(directory="../frontend/static"), name="static")
-app.mount("/admin", StaticFiles(directory="../frontend/static/pages/admin", html=True), name="admin")
-app.mount("/customer", StaticFiles(directory="../frontend/static/pages/customer", html=True), name="customer")
-app.mount("/auth", StaticFiles(directory="../frontend/static/pages/auth", html=True), name="auth")
+app.mount(
+    "/static",
+    StaticFiles(directory=str(FRONTEND_DIR)),
+    name="static"
+)
+
+app.mount(
+    "/admin",
+    StaticFiles(
+        directory=str(FRONTEND_DIR / "pages" / "admin"),
+        html=True
+    ),
+    name="admin"
+)
+
+app.mount(
+    "/customer",
+    StaticFiles(
+        directory=str(FRONTEND_DIR / "pages" / "customer"),
+        html=True
+    ),
+    name="customer"
+)
+
+app.mount(
+    "/auth",
+    StaticFiles(
+        directory=str(FRONTEND_DIR / "pages" / "auth"),
+        html=True
+    ),
+    name="auth"
+)
+
 
 @app.exception_handler(DomainError)
 async def domain_error_handler(_, exc: DomainError):
@@ -73,11 +107,9 @@ async def validation_error_handler(_, exc: RequestValidationError):
 
 @app.get("/", include_in_schema=False)
 async def root():
-    from fastapi.responses import FileResponse
-    return FileResponse("../frontend/static/index.html")
+    return FileResponse(str(FRONTEND_DIR / "index.html"))
 
 
-# Register routers
 app.include_router(admin_auth_router, prefix="/api/v1")
 app.include_router(customer_auth_router, prefix="/api/v1")
 app.include_router(households_router, prefix="/api/v1")
