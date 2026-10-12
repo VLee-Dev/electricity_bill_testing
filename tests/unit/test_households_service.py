@@ -11,7 +11,12 @@ from app.features.households.service import (
     update_household,
     delete_household,
 )
+from app.models.household import Household
 
+
+# ============================================================
+# TEST FIXTURES
+# ============================================================
 
 @pytest.fixture
 def db():
@@ -30,6 +35,10 @@ def registration_data():
         initial_password="Password123",
     )
 
+
+# ============================================================
+# EXISTING HOUSEHOLDS TEST CASES (HH001 - HH012)
+# ============================================================
 
 @pytest.mark.parametrize(
     "results,error_code",
@@ -232,3 +241,64 @@ def test_delete_household_success(db):
 
     db.commit.assert_called_once()
     db.refresh.assert_called_once_with(household)
+
+
+# ============================================================
+# NEW HOUSEHOLDS TEST CASES (HH013 - HH015)
+# ============================================================
+
+def test_get_household_success(db):
+    """HH013: Get an existing household successfully."""
+    household = SimpleNamespace(
+        id="hh-1",
+        customer_code="KH001",
+        full_name="Nguyen Van A",
+        status="active",
+    )
+
+    db.get.return_value = household
+
+    result = get_household(db, "hh-1")
+
+    assert result is household
+    assert result.id == "hh-1"
+    assert result.customer_code == "KH001"
+
+    db.get.assert_called_once_with(Household, "hh-1")
+
+
+def test_update_household_not_found(db):
+    """HH014: Updating a nonexistent household raises NotFoundError."""
+    db.get.return_value = None
+    data = MagicMock()
+
+    with pytest.raises(NotFoundError):
+        update_household(db, "missing-id", data)
+
+    db.get.assert_called_once_with(Household, "missing-id")
+    data.model_dump.assert_not_called()
+    db.commit.assert_not_called()
+    db.refresh.assert_not_called()
+
+
+def test_list_households_without_filters(db):
+    """HH015: List all households without search or status filters."""
+    households = [
+        SimpleNamespace(id="hh-1", status="active"),
+        SimpleNamespace(id="hh-2", status="inactive"),
+    ]
+
+    db.scalars.return_value.all.return_value = households
+
+    result = list_households(db)
+
+    assert result == households
+    assert len(result) == 2
+
+    db.scalars.assert_called_once()
+
+    query = db.scalars.call_args.args[0]
+    query_text = str(query).lower()
+
+    assert "order by" in query_text
+    assert "where" not in query_text

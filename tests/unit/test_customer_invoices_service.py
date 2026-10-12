@@ -13,6 +13,10 @@ from app.models.invoice import Invoice
 from app.models.payment import Payment
 
 
+# ============================================================
+# TEST HELPERS
+# ============================================================
+
 def make_customer():
     return SimpleNamespace(household_id="household-1")
 
@@ -25,6 +29,10 @@ def make_invoice(status="unpaid", household_id="household-1"):
         total_amount=216000,
     )
 
+
+# ============================================================
+# EXISTING TEST CASES (CI001 - CI008)
+# ============================================================
 
 def test_get_customer_invoices_success():
     db = MagicMock()
@@ -114,3 +122,71 @@ def test_pay_invoice_simulated_forbidden():
 
     db.add.assert_not_called()
     db.commit.assert_not_called()
+
+
+# ============================================================
+# NEW TEST CASES (CI009 - CI011)
+# ============================================================
+
+def test_pay_invoice_simulated_not_found():
+    """CI009: Cannot pay an invoice that does not exist."""
+    db = MagicMock()
+    db.get.return_value = None
+
+    with pytest.raises(NotFoundError):
+        pay_invoice_simulated(db, "missing", make_customer())
+
+    db.get.assert_called_once_with(Invoice, "missing")
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+    db.refresh.assert_not_called()
+
+
+def test_pay_invoice_simulated_zero_amount():
+    """CI010: Verify current behavior for a zero-amount invoice."""
+    db = MagicMock()
+
+    invoice = make_invoice(status="unpaid")
+    invoice.total_amount = 0
+
+    db.get.return_value = invoice
+
+    result = pay_invoice_simulated(
+        db,
+        "invoice-1",
+        make_customer(),
+    )
+
+    assert isinstance(result, Payment)
+    assert result.invoice_id == "invoice-1"
+    assert result.amount == 0
+    assert result.method == "online_simulated"
+    assert result.confirmed_by is None
+    assert invoice.status == "paid"
+
+    db.add.assert_called_once_with(result)
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(result)
+
+
+def test_get_customer_invoices_query_filters_household():
+    """CI011: Query must filter invoices by the customer's household."""
+    db = MagicMock()
+    customer = make_customer()
+
+    db.scalars.return_value.all.return_value = []
+
+    result = get_customer_invoices(db, customer)
+
+    assert result == []
+    db.scalars.assert_called_once()
+
+    query = db.scalars.call_args.args[0]
+    query_text = str(query).lower()
+
+    assert "household_id" in query_text
+    assert "where" in query_text
+    assert "order by" in query_text
+
+    compiled = query.compile()
+    assert customer.household_id in compiled.params.values()

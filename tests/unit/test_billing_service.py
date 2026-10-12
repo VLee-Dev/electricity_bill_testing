@@ -13,7 +13,6 @@ from app.features.billing_new.service import (
 from app.models.invoice import Invoice
 from app.models.meter_reading import MeterReading
 
-
 def make_reading(consumption=80):
     return SimpleNamespace(
         id="reading-1",
@@ -52,6 +51,10 @@ def make_db(consumption=80, tiers=None, vat=None, due_days=None):
     ]
     return db
 
+
+# ============================================================
+# EXISTING BILLING TEST CASES (BILL001 - BILL015)
+# ============================================================
 
 def test_calculate_invoice_success():
     db = make_db(consumption=80)
@@ -222,3 +225,93 @@ def test_list_invoices_both_filters():
         status="paid",
     ) == []
     db.scalars.assert_called_once()
+
+
+# ============================================================
+# NEW BILLING TEST CASES (BILL016 - BILL020)
+# ============================================================
+
+def test_calculate_invoice_tier_lower_boundary():
+    """BILL016: 51 kWh must use tier 2."""
+    db = make_db(consumption=51)
+
+    with patch("app.features.billing_new.service.send_invoice_email"):
+        invoice = calculate_invoice(db, "reading-1")
+
+    assert invoice.tier_details[0].tier_no == 2
+    assert invoice.tier_details[0].kwh_applied == 51
+    assert invoice.subtotal == 127500
+    assert invoice.vat_amount == 10200
+    assert invoice.total_amount == 137700
+
+
+def test_calculate_invoice_tier_upper_boundary():
+    """BILL017: 100 kWh must use tier 2."""
+    db = make_db(consumption=100)
+
+    with patch("app.features.billing_new.service.send_invoice_email"):
+        invoice = calculate_invoice(db, "reading-1")
+
+    assert invoice.tier_details[0].tier_no == 2
+    assert invoice.tier_details[0].kwh_applied == 100
+    assert invoice.subtotal == 250000
+    assert invoice.vat_amount == 20000
+    assert invoice.total_amount == 270000
+
+
+def test_calculate_invoice_consumption_fallback():
+    """BILL018: Calculate consumption from meter readings."""
+    db = make_db()
+
+    reading = make_reading(consumption=80)
+    reading.consumption = None
+    reading.old_reading = 120
+    reading.new_reading = 180
+
+    db.get.return_value = reading
+
+    with patch("app.features.billing_new.service.send_invoice_email"):
+        invoice = calculate_invoice(db, "reading-1")
+
+    assert invoice.tier_details[0].tier_no == 2
+    assert invoice.tier_details[0].kwh_applied == 60
+    assert invoice.subtotal == 150000
+    assert invoice.vat_amount == 12000
+    assert invoice.total_amount == 162000
+
+
+def test_calculate_invoice_vat_round_half_up():
+    """BILL019: VAT must be rounded using ROUND_HALF_UP."""
+    db = make_db(
+        consumption=1,
+        tiers=[make_tier(1, 0, 50, 15)],
+        vat="0.10",
+    )
+
+    with patch("app.features.billing_new.service.send_invoice_email"):
+        invoice = calculate_invoice(db, "reading-1")
+
+    assert invoice.subtotal == 15
+    assert invoice.vat_amount == 2
+    assert invoice.total_amount == 17
+
+
+def test_calculate_invoice_open_ended_tier_fallback():
+    """BILL020: Use open-ended tier when no tier matches directly."""
+    db = make_db(
+        consumption=150,
+        tiers=[
+            make_tier(1, 0, 50, 2000),
+            make_tier(2, 51, 100, 2500),
+            make_tier(3, 201, None, 3000),
+        ],
+    )
+
+    with patch("app.features.billing_new.service.send_invoice_email"):
+        invoice = calculate_invoice(db, "reading-1")
+
+    assert invoice.tier_details[0].tier_no == 3
+    assert invoice.tier_details[0].kwh_applied == 150
+    assert invoice.subtotal == 450000
+    assert invoice.vat_amount == 36000
+    assert invoice.total_amount == 486000
