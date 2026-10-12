@@ -1,5 +1,5 @@
 from datetime import date
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PriceTierOut(BaseModel):
@@ -12,11 +12,11 @@ class PriceTierOut(BaseModel):
     effective_from: date
     effective_to: date | None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PriceTierUpdateIn(BaseModel):
     """Schema input để cập nhật giá điện"""
     unit_price: int = Field(gt=0, description="Đơn giá (đồng/kWh)")
     effective_from: date = Field(description="Ngày hiệu lực")
+

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AdminLoginIn(BaseModel):
@@ -11,8 +11,7 @@ class AdminOut(BaseModel):
     username: str
     full_name: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TokenOut(BaseModel):

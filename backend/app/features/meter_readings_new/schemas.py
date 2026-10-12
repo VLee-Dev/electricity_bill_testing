@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MeterReadingCreateIn(BaseModel):
@@ -23,5 +23,5 @@ class MeterReadingOut(BaseModel):
     recorded_at: datetime
     has_invoice: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+

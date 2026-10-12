@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class InvoiceCreateIn(BaseModel):
@@ -13,24 +13,21 @@ class InvoiceTierDetailOut(BaseModel):
     unit_price: int
     amount: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class HouseholdBriefOut(BaseModel):
     customer_code: str
     full_name: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MeterReadingBriefOut(BaseModel):
     period: str
     consumption: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InvoiceOut(BaseModel):
@@ -47,8 +44,7 @@ class InvoiceOut(BaseModel):
     household: HouseholdBriefOut | None = None
     meter_reading: MeterReadingBriefOut | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InvoiceListOut(BaseModel):
@@ -63,5 +59,5 @@ class InvoiceListOut(BaseModel):
     household: HouseholdBriefOut | None = None
     meter_reading: MeterReadingBriefOut | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+

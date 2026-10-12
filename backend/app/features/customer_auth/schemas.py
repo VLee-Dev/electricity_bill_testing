@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class CustomerLoginIn(BaseModel):
@@ -16,8 +16,7 @@ class CustomerOut(BaseModel):
     household_id: str
     must_change_password: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class HouseholdOut(BaseModel):
@@ -30,10 +29,10 @@ class HouseholdOut(BaseModel):
     meter_number: str
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
