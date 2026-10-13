@@ -232,3 +232,149 @@ Tất cả routes có prefix `/api/v1`. Xem Swagger UI đầy đủ tại `/docs
 - `docs/TEST_CASES.md` — Test cases
 - `qa/selenium/test_e2e.py` — E2E browser tests
 - `qa/jmeter/load_test.jmx` — Load test script
+
+# Kiểm thử phần YC6,7,8:
+
+**BƯỚC 1 – CẬP NHẬT CODE MỚI NHẤT**
+
+Mở VS Code, mở thư mục dự án `electricity_bill_testing`, sau đó mở Terminal (PowerShell).
+Chạy:
+
+git status
+git branch --show-current
+
+Nếu đang ở nhánh `main` và hiện `working tree clean`, chạy tiếp:
+
+git pull --ff-only origin main
+git log -1 --oneline
+
+Commit hiện tạii cần có:
+
+`4aa35bc kiemthu: dat 100 phan tram do bao phu ma nguon`
+
+Nếu đang có file sửa chưa commit hoặc ở nhánh khác, gửi kết quả trước, đừng pull vội.
+
+**BƯỚC 2 – KÍCH HOẠT MÔI TRƯỜNG PYTHON**
+
+Tại thư mục gốc dự án, chạy:
+
+.\.venv\Scripts\Activate.ps1
+python --version
+python -m pytest --version
+
+**BƯỚC 3 – KIỂM TRA YC6: UNIT TEST VÀ COVERAGE**
+
+Chạy:
+
+python -m pytest tests\unit tests\integration -q --cov=backend/app --cov-report=term-missing
+
+
+Kết quả hiện tại trên máy mình:
+
+- 162 test PASS
+- 0 FAIL
+- Code Coverage 100%
+- 1.059 statements, 0 missed
+
+
+**BƯỚC 4 – KIỂM TRA YC7: SELENIUM E2E**
+
+Trước khi chạy phải đảm bảo đã cài selennium webdriver đã được cài dặt, backend hoạt động, Chrome/WebDriver dùng được và kết nối tới database kiểm thử riêng. Selenium có thể thêm hoặc sửa dữ liệu, nên không chạy trên database đang chứa dữ liệu quan trọng.
+
+Hướng dẫn cài đặt:
+
+Mở PowerShell trong thư mục gốc dự án:
+
+.\.venv\Scripts\Activate.ps1
+python -m pip show selenium
+
+Nếu hiện thông tin phiên bản Selenium thì đã cài.
+
+Nếu báo không tìm thấy, chạy:
+
+python -m pip install -U selenium
+
+Lưu ý: Máy cần cài Google Chrome. Selenium phiên bản 4.6 trở lên hỗ trợ Selenium Manager, có thể tự động quản lý ChromeDriver tương thích mà không cần tải thủ công.
+
+Khi môi trường đã sẵn sàng, chạy:
+
+$env:E2E_ADMIN_PASSWORD="admin123"
+python -m pytest qa\selenium\test_e2e.py -q --tb=short
+
+Kết quả hiện tại trên máy mình: `14 passed`.
+
+**BƯỚC 5 – KIỂM TRA YC8: Jmeter**
+
+5.1. Cài Java và JMeter
+Kiểm tra Java:
+
+java -version
+
+Nếu chưa có Java, tải JDK
+
+**Cài Apache JMeter 5.6.3:**
+
+1. Tải `apache-jmeter-5.6.3.zip` tại https://archive.apache.org/dist/jmeter/binaries/
+2. Giải nén vào `D:\JMeter`.
+3. Mở JMeter bằng PowerShell:
+
+& "D:\JMeter\apache-jmeter-5.6.3\bin\jmeter.bat"
+
+JMeter 5.6.3 hỗ trợ Java 8 trở lên.
+
+5.2. Kiểm tra kịch bản
+
+Tại thư mục gốc dự án, chạy:
+
+Get-ChildItem .\qa\jmeter -Filter *.jmx
+
+Hai kịch bản cần có:
+- `qa\jmeter\load_test.jmx` – 5 users.
+- `qa\jmeter\load_test_50users.jmx` – 50 users.
+
+5.3. Chuẩn bị backend
+- Cài đặt và chạy backend, PostgreSQL theo hướng dẫn dự án.
+- Sử dụng database kiểm thử riêng.
+- Kiểm tra API tại `http://127.0.0.1:8000/docs` nếu backend chạy ở cổng 8000.
+- Kiểm tra URL, tài khoản và dữ liệu request trong JMeter.
+**Không chạy kiểm thử trên database chứa dữ liệu quan trọng.**
+5.4. Thực hiện kiểm thử
+Trong JMeter:
+1. Chọn File → Open → mở `load_test.jmx`.
+2. Kiểm tra Thread Group có **5 users** và cấu hình API chính xác.
+3. Nhấn Start, chờ hoàn thành và xem kết quả.
+4. Mở `load_test_50users.jmx`.
+5. Kiểm tra Thread Group có 50 users, sau đó chạy tương tự.
+
+Theo dõi chỉ số: Samples, Average, Error %, Throughput và 95th Percentile.
+
+### 5.6. Kiểm tra kết quả
+
+Chạy PowerShell:
+
+Get-ChildItem results -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Extension -eq ".jtl" } |
+    Select-Object -ExpandProperty FullName
+
+**Kết quả tham chiếu đã thực hiện:**
+
+Kịch bản 5 users:
+Tổng số request: 15.
+Số request thành công: 15/15 (100%).
+Tỷ lệ lỗi: 0%.
+Thời gian phản hồi trung bình: 163,4 ms.
+
+Kịch bản 50 users:
+Tổng số request: 150.
+Số request thành công: 150/150 (100%).
+Tỷ lệ lỗi: 0%.
+Thời gian phản hồi trung bình: 128,99 ms.
+
+Các file kết quả tham chiếu:
+results\load_test_5users.jtl
+results\load_test_50users.jtl
+Các báo cáo HTML:
+results\jmeter_report_5users\index.html
+results\jmeter_report_50users\index.html
+```
+**Lưu ý:** Thư mục `results/` có thể không được đồng bộ qua GitHub. Cần chạy lại hoặc nhận báo cáo từ mình.
